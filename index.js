@@ -4,7 +4,11 @@ var app = express();
 const fs = require("fs");
 var os = require("os");
 var hostname = os.hostname();
-console.log('Hostname: '+hostname);
+const UUID = require('node-uuid');
+
+const httpService = require('./service/HttpService');
+const uriPath = '/infos/init';
+
 var allowed_origins = ['edgeofmap.com:*',
 //                       'https://bubububaoshe.github.io:*',
 //					   'localhost:*',
@@ -14,18 +18,6 @@ if (hostname == "xps-9550") {
   allowed_origins = '*:*';
   console.log('Running on localhost; allowing all incoming connections.');
 }
-
-const http=require("http");
-
-http.get("http://py.amazingtm.com/index.php?keyword=veblen&keytype=0",function(data){
-    var str="";
-    data.on("data",function(chunk){
-        str+=chunk;//监听数据响应，拼接数据片段
-    })
-    data.on("end",function(){
-        console.log(str.toString())
-    })
-})
 
 var privateKey = fs.readFileSync('./cert/server.key').toString();
 var certificate = fs.readFileSync('./cert/server.crt').toString();
@@ -37,6 +29,8 @@ var credentials = {
 
 var https = require('https').Server(credentials,app);
 var io = require('socket.io')(https, { origins: allowed_origins });
+// var http = require('http').Server(app);
+// var io = require('socket.io')(http, { origins: allowed_origins });
 
 app.get('/', function(req, res){
 	res.sendFile(__dirname + "/index.html");
@@ -140,7 +134,7 @@ class PlayerMatcher {
 		  } else {
 		    msg = "对方玩家也已确认";
 		  }
-			p.emit("Match_ConfirmMatchAck", msg);
+		  p.emit("Match_ConfirmMatchAck", msg);
 		}
 		p.match_confirmed = true;
 		if (other.match_confirmed == true) {
@@ -199,7 +193,6 @@ class Game {
     this.round_num = 1;
     this.game_id = g_serial_game;
     this.actions = []; // [ [rank, action, param] ]
-      //TODO send request to get token from server
     g_serial_game += 1;
     this.pack = [1, 2];
   }
@@ -210,8 +203,18 @@ class Game {
     this.players[1].game = this;
     this.players[0].state = "setup";
     this.players[1].state = "setup";
+    let uuid = UUID.v1().replace(/[-]/g,"");
+    this.gameToken = uuid;
+    let resPromise = httpService.post(uriPath,
+          {gameToken: uuid });
+    resPromise.then(res=>{
+       //TODO retry
+    });
+    // TODO add game token into emit
     this.players[0].emit('Match_GameSetupDefensive', this.pack);
     this.players[1].emit('Match_GameSetupOffensive', this.pack);
+    this.players[0].emit('Match_GameToken', this.gameToken);
+    this.players[1].emit('Match_GameToken', this.gameToken);
     // Statistics
     this.turns[0] = 0;
     this.turns[1] = 0;
@@ -899,6 +902,9 @@ io.on('connection', function(socket) {
 https.listen(3000, function() {
 	console.log("Listening on port 3000");
 });
+// http.listen(3000, function() {
+//     console.log("Listening on port 3000");
+// });
 
 function delayedFunc(func, secs){
   setTimeout(function() {
