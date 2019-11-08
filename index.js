@@ -234,6 +234,21 @@ class Game {
       this.players[1].emit('Info_SetPack', this.pack);
   }
 
+  /**
+   * Broadcast content from player client.
+   * TODO specify player info with broadcast
+   * @param player, caller player
+   * @param content, player chat content
+   */
+  broadcast(player, content){
+      var pidx = this.GetPlayerIndexBySocket(player);
+      for(let idx = 0; idx<this.players.length; idx++){
+          if(pidx !== idx){
+              this.players[idx].emit('Chat_Receive',this.players[idx].player_id ,content);
+          }
+      }
+  }
+
   GetPlayerIndexBySocket(socket) {
     if (socket == this.players[0]) return 0;
     else if (socket == this.players[1]) return 1;
@@ -784,6 +799,14 @@ io.on('connection', function(socket) {
     }
 	});
 
+    /**
+     * Receive player chat and broadcast;
+     */
+	socket.on("Chat_Send",(content)=>{
+        var g = FindGameBySocket(socket);
+        g.broadcast(socket, content);
+    });
+
 	socket.on('Match_SetupComplete', (sp, snapshot) => {
 	  var g = FindGameBySocket(socket);
 	  if (g != null) g.OnPlayerSetupComplete(socket, sp, snapshot);
@@ -899,12 +922,12 @@ io.on('connection', function(socket) {
 	});
 });
 
-https.listen(3000, function() {
-	console.log("Listening on port 3000");
-});
-// http.listen(3000, function() {
-//     console.log("Listening on port 3000");
+// https.listen(3000, function() {
+// 	console.log("Listening on port 3000");
 // });
+http.listen(3000, function() {
+    console.log("Listening on port 3000");
+});
 
 function delayedFunc(func, secs){
   setTimeout(function() {
