@@ -741,7 +741,7 @@ io.on('connection', function(socket) {
 	});
 
 	socket.on('Info_PlayerInfo', (nickname, avataridx, pack) => {
-    socket.nickname = nickname;
+      socket.nickname = nickname;
 	  socket.avataridx = avataridx;
 	  console.log('Player Info: ID=' + socket.player_id +
 	    ", nickname=" + nickname +
@@ -836,6 +836,9 @@ io.on('connection', function(socket) {
         for (let i = 0; i < g_all_sockets.length; i++) {
             let p = g_all_sockets[i];
             console.log(p.nickname + " - " + inviterName);
+            if(p.nickname === undefined || inviterName === undefined){
+                continue;
+            }
             if (p.nickname.toString() === inviterName.toString()) {
                 if (g_playermatcher.IsPlayerInMatchQueueOrMatched(p)) {
                     socket.emit('Match_InvalidInvitation', '对方正在随机匹配队列中');
