@@ -19,6 +19,10 @@ if (hostname == "xps-9550") {
   console.log('Running on localhost; allowing all incoming connections.');
 }
 
+const status_succeed = 'SUCCEED';
+const status_fail = 'FAIL';
+
+var isSsl = false;
 var privateKey = fs.readFileSync('./cert/server.key').toString();
 var certificate = fs.readFileSync('./cert/server.crt').toString();
 var credentials = {
@@ -27,10 +31,13 @@ var credentials = {
     requestCert: false,
     rejectUnauthorized: false};
 
-var https = require('https').Server(credentials,app);
-var io = require('socket.io')(https, { origins: allowed_origins });
-// var http = require('http').Server(app);
-// var io = require('socket.io')(http, { origins: allowed_origins });
+if(isSsl) {
+    var https = require('https').Server(credentials, app);
+    var io = require('socket.io')(https, {origins: allowed_origins});
+} else {
+    var http = require('http').Server(app);
+    var io = require('socket.io')(http, {origins: allowed_origins});
+}
 
 app.get('/', function(req, res){
 	res.sendFile(__dirname + "/index.html");
@@ -94,12 +101,18 @@ class PlayerMatcher {
 	}
 
 	// P0 找 P1
-	BringTwoPlayersIntoPair(p0, p1) {
+	BringTwoPlayersIntoPair(p0, p1, share = false) {
+	  let inviterMsg = "找到了这位小伙伴，请等待ta确认：";
+	  let inviteeMsg = p0.nickname + "邀请你来一局，请确认是否开始：";
+	  if(share === true){
+          inviteeMsg = p0.nickname + "点击了你的链接并邀请你来一局！";
+          inviterMsg = "正在邀请对方！"
+      }
 	  this.matched_pairs.push([p0, p1]);
 	  p0.can_be_found = false;
 	  p1.can_be_found = false;
-	  p0.emit("Match_FoundMatch", p1.nickname, p1.avataridx, "找到了这位小伙伴，请等待ta确认：");
-	  p1.emit("Match_FoundMatch", p0.nickname, p0.avataridx, "玩家"+p0.player_id+"邀请你来一局，请确认是否开始：");
+	  p0.emit("Match_FoundMatch", p1.nickname, p1.avataridx, inviterMsg);
+	  p1.emit("Match_FoundMatch", p0.nickname, p0.avataridx, inviteeMsg);
 	}
 
 	FindPairByPlayer(p) {
@@ -295,7 +308,11 @@ class Game {
     if (pidx != -1) {
       p.state = "setup_complete";
       var other = this.players[1 - pidx];
-      if (other.state == "setup") {
+      //If opponent dropped, send msg
+      if (other === null){
+
+      }
+      else if (other.state == "setup") {
         other.emit('Game_OtherPlayerSetupComplete');
       } else {
         console.log('[both player finished]');
@@ -787,7 +804,7 @@ io.on('connection', function(socket) {
             socket.emit('Match_InvalidInvitation', '对方正在游戏中');
           } else {
             // Put both players into the matching queue and match them
-            g_playermatcher.BringTwoPlayersIntoPair(socket, p);
+            g_playermatcher.BringTwoPlayersIntoPair(socket, p, false);
             ok = true;
             break;
           }
@@ -800,11 +817,41 @@ io.on('connection', function(socket) {
 	});
 
     /**
-     * Receive player chat and broadcast;
+     * Receive player chat and broadcast.
+     * @param content{string}, user chat content
      */
 	socket.on("Chat_Send",(content)=>{
-        var g = FindGameBySocket(socket);
+        let g = FindGameBySocket(socket);
         g.broadcast(socket, content);
+    });
+
+    /**
+     * Player clicked share link, find inviter and call invite process.
+     * @param content{string}, inviter name
+     */
+	socket.on("Invited_Confirmed", (content)=>{
+        let ok = false;
+        let inviterName = decodeURI(content);
+        console.log("Searching for " + inviterName);
+        for (let i = 0; i < g_all_sockets.length; i++) {
+            let p = g_all_sockets[i];
+            console.log(p.nickname + " - " + inviterName);
+            if (p.nickname.toString() === inviterName.toString()) {
+                if (g_playermatcher.IsPlayerInMatchQueueOrMatched(p)) {
+                    socket.emit('Match_InvalidInvitation', '对方正在随机匹配队列中');
+                } else if (FindGameBySocket(p) != null) {
+                    socket.emit('Match_InvalidInvitation', '对方正在游戏中');
+                } else {
+                    // Put both players into the matching queue and match them
+                    g_playermatcher.BringTwoPlayersIntoPair(socket, p, true);
+                    ok = true;
+                    break;
+                }
+            }
+        }
+        if (ok === false) {
+            socket.emit('Match_InvalidInvitation', inviterName + "不在线呢，快邀请他上线吧！");
+        }
     });
 
 	socket.on('Match_SetupComplete', (sp, snapshot) => {
@@ -922,12 +969,15 @@ io.on('connection', function(socket) {
 	});
 });
 
-// https.listen(3000, function() {
-// 	console.log("Listening on port 3000");
-// });
-http.listen(3000, function() {
-    console.log("Listening on port 3000");
-});
+if(isSsl) {
+    https.listen(3000, function () {
+        console.log("Listening on port 3000");
+    });
+} else {
+    http.listen(3000, function () {
+        console.log("Listening on port 3000");
+    });
+}
 
 function delayedFunc(func, secs){
   setTimeout(function() {
