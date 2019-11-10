@@ -97,6 +97,8 @@ class PlayerMatcher {
 			p0.matched = true;
 			p0.emit("Match_FoundMatch", p1.nickname, p1.avataridx, "请选择牌组并确认：");
 			p1.emit("Match_FoundMatch", p0.nickname, p0.avataridx, "请选择牌组并确认：");
+            p0.emit('Info_SetPack', [1,2]);
+            p1.emit('Info_SetPack', [1,2]);
 		}
 	}
 
@@ -113,6 +115,8 @@ class PlayerMatcher {
 	  p1.can_be_found = false;
 	  p0.emit("Match_FoundMatch", p1.nickname, p1.avataridx, inviterMsg);
 	  p1.emit("Match_FoundMatch", p0.nickname, p0.avataridx, inviteeMsg);
+      p0.emit('Info_SetPack', [1,2]);
+      p1.emit('Info_SetPack', [1,2]);
 	}
 
 	FindPairByPlayer(p) {
@@ -173,8 +177,8 @@ class PlayerMatcher {
 	SetupGame(pair) {
 	  console.log("Should start a game now");
 	  this.matched_pairs.RemovePair(pair);
-	  var g = new Game(pair[0], pair[1]);
-	  g.pack = pair[0].pack; // 假定两人的pack是相同的
+	  let g = new Game(pair[0], pair[1]);
+	  // g.pack = pair[0].pack; // 假定两人的pack是相同的
 	  g_all_games.push(g);
 	  g.Setup();
 	}
@@ -188,7 +192,7 @@ class PlayerMatcher {
 
 g_playermatcher = new PlayerMatcher();
 g_all_games = [];
-g_serial_game = 1;
+var g_serial_game = 1;
 
 class Game {
   constructor(p0, p1) {
@@ -237,6 +241,7 @@ class Game {
     this.flag_oppo_obtain_redeal = false;
     this.turn_num = 1;
     this.actions = [];
+    this.SetPack(this.pack);
   }
   
   SetPack(p) { 
@@ -281,16 +286,16 @@ class Game {
     console.log('[OnPlayerDisconnectedOrCanceled] player_id='+p.player_id);
     if (pidx != -1) {
       var other_socket = this.players[1-pidx];
-			if (other_socket != null) {
-      	other_socket.emit('Room_PlayerDisconnected');
-			}
+        if (other_socket != null) {
+      	  other_socket.emit('Room_PlayerDisconnected');
+        }
 
-			this.players[pidx] = null;
-			if (this.players[1 - pidx] == null) {
-				// 双方都离线了
-				console.log('[Player Disconnect] Both players disconnected, the game will be disposed');
-				g_all_games.remove(this);
-			}
+		this.players[pidx] = null;
+		if (this.players[1 - pidx] == null) {
+			// 双方都离线了
+			console.log('[Player Disconnect] Both players disconnected, the game will be disposed');
+			g_all_games.remove(this);
+		}
     }
   }
 
@@ -734,8 +739,9 @@ io.on('connection', function(socket) {
 		g_all_sockets.remove(socket);
 		// 若是已开始了...
 		var g = FindGameBySocket(socket);
-		if (g != undefined)
-		  g.OnPlayerDisconnectedOrCanceled(socket);
+		if (g != undefined) {
+            g.OnPlayerDisconnectedOrCanceled(socket);
+        }
 		console.log("player " + socket.player_id + " left, " +
 		  g_all_sockets.length + " sockets, " + g_all_games.length + " games");
 	});
