@@ -1,6 +1,5 @@
 const http = require("http");
 const post =async function(uriPath, body, header){
-    console.log("posted");
     let options = {
         hostname: 'localhost',
         port: 8080,

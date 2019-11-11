@@ -34,9 +34,11 @@ var credentials = {
 if(isSsl) {
     var https = require('https').Server(credentials, app);
     var io = require('socket.io')(https, {origins: allowed_origins});
+    io.set('heartbeat interval', 2000);
 } else {
     var http = require('http').Server(app);
     var io = require('socket.io')(http, {origins: allowed_origins});
+    io.set('heartbeat interval', 2000);
 }
 
 app.get('/', function(req, res){
