@@ -840,6 +840,10 @@ io.on('connection', function(socket) {
 	socket.on("Invited_Confirmed", (content)=>{
         let ok = false;
         let inviterName = decodeURI(content);
+        if (inviterName === '无名之人') {
+            socket.emit('Match_InvalidInvitation', '无名之人过于难找，请尔等【入局】或寻觅！');
+            return;
+        }
         console.log("Searching for " + inviterName);
         for (let i = 0; i < g_all_sockets.length; i++) {
             let p = g_all_sockets[i];
