@@ -768,6 +768,8 @@ io.on('connection', function(socket) {
 	});
 
 	socket.on('Match_ReadyToMatch', (nickname, avataridx) => {
+        socket.nickname = nickname;
+        socket.avataridx = avataridx;
 		g_playermatcher.OnNewPlayerReadyToMatch(socket);
 		g_playermatcher.MatchOnePair();
 	});
